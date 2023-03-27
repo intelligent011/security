@@ -3,12 +3,19 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
-//require mongoose
+//require mongoose for DB
 const mongoose = require("mongoose");
+
+
+
 //encrypt
-const encrypt = require("mongoose-encryption");
 
+//hashing md5
+//const md5 = require("md5");
 
+//hashing bcrypt
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 
@@ -29,7 +36,7 @@ const userSchema = new mongoose.Schema ({
 //key for encryption
 //transfered secret key to env file
 
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
+
 
 //new model
 const User = new mongoose.model("User", userSchema);
@@ -54,18 +61,19 @@ app.get("/register", function(req, res) {
 });
 
 app.post("/register", function(req, res) {
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
+
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });
+    
+        newUser.save()
+            .then(function(){
+                res.render("secrets")})
+            .catch(function(err){
+                console.log(err)})
     });
-
-    newUser.save()
-        .then(function(){
-            res.render("secrets")})
-        .catch(function(err){
-            console.log(err)})
-
-
 });
 
 //lets create post method for login using existing users data
@@ -75,15 +83,16 @@ app.post("/login", function(req, res) {
     //lets check if current user exists
     User.findOne({email: username})
         .then(function(foundUser) {
-            if (foundUser.password === password) {
-                res.render("secrets")
-            }
-
+            bcrypt.compare(req.body.password, foundUser.password, function(err, result) {
+                if (result === true) {
+                    res.render("secrets")
+                }
+            });
         })
         .catch(function(err) {
             console.log(err)
         })
-})
+});
 
 
 
